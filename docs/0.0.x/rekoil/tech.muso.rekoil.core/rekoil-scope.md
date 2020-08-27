@@ -9,5 +9,5 @@ The provided scope inherits the [coroutineContext](#)
 from the outer scope, following the execution pattern of the [coroutineScope](#) Contract Builder.
 
 If [launch](rekoil-scope.md#tech.muso.rekoil.core$rekoilScope(kotlin.Boolean, kotlin.coroutines.SuspendFunction1((tech.muso.rekoil.core.RekoilScope, kotlin.Unit)))/launch) is true, then the RekoilScope will be launched into a new scope.
-Then the RekoilScope will require a manual [RekoilScope.release](-rekoil-scope/release.md) call.
+Then the RekoilScope will require a manual [RekoilScope.releaseScope](-rekoil-scope/release-scope.md) call.
 

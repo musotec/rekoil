@@ -1,4 +1,6 @@
 $dokka.format:gfm
 $dokka.linkExtension:md
 
+tech.muso.rekoil
 tech.muso.rekoil.core
+tech.muso.rekoil.ktx

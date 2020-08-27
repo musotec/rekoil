@@ -3,6 +3,7 @@ package tech.muso.rekoil.test.helpers
 
 import junit.framework.Assert.fail
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestCoroutineScope
 import kotlinx.coroutines.test.runBlockingTest
@@ -28,7 +29,7 @@ const val ATOM_VALUE_1 = "default"
 const val ATOM_VALUE_2 = "new value"
 const val ATOM_VALUE_3 = "third value"
 
-var verbose = false
+var verbose = true
 inline fun <T : Any> T.assertEquals(expected: Any?, actual: Any?, message: String? = null) {
     if (verbose) {
         try {
@@ -64,7 +65,8 @@ inline fun rekoilScopeTest(noinline block: suspend TestRekoilScope.() -> Unit) =
     runBlockingTest {
         TestRekoilScope(coroutineScope = this).apply {
             launch(block).join()    // join to ensure all code in block executes.
-            release()               // release to free any jobs left from communication channels
+            releaseScope()               // release to free any jobs left from communication channels
+
         }
     }
 

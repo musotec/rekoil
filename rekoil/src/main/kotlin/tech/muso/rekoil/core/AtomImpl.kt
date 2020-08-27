@@ -18,7 +18,7 @@ public interface Atom<T : Any> : RekoilContext.ValueNode<T> {
 internal open class AtomImpl<T : Any>(
     coroutineScope: CoroutineScope,
     parentContext: SupervisorRekoilContextImpl,
-    default: () -> T
+    val default: () -> T
 ) : ValueNodeImpl<T>(coroutineScope), Atom<T> {
 
     // get by lazy so that we only have one key per object.
@@ -29,16 +29,25 @@ internal open class AtomImpl<T : Any>(
 
     // recompute the value function
     override fun invalidate() {
-//        TODO("recompute with the cached async lambda")
+        value = default()   // TODO: evaluate in async
     }
 
-    @Volatile override var value = default()
+    @Volatile override var value = default().also {
+        Log.a("$this.value <- $it")
+    }
     set(value) {
-        // always set backing property first
-        field = value
-        // when we update our value, notify the parent.
-        printdbg("$this set(value) -> send($value)")
-        send(value)
+        if (field != value) {
+            Log.a("$this.value <- $value")
+            // always set backing property first
+            field = value
+            // otherwise there is a race condition between
+            // the scope's broadcast channel subscription [RekoilContext.register()]
+            // and the
+            send(value) {
+                // when we update our value, notify the parent.
+                Log.a("$shortName send($value)")
+            }
+        }
     }
 
     override fun setValueAsync(value: suspend () -> T) {
@@ -51,7 +60,11 @@ internal open class AtomImpl<T : Any>(
         value = default()
     }
 
+    private inline val shortName: String get() = "Atom[${this.identifier}]"
+
+    // needed because value can be null prior to invocation of default
+    @Suppress("UNNECESSARY_SAFE_CALL", "USELESS_ELVIS")
     override fun toString(): String {
-        return "Atom[${this.identifier}](`$value`)"
+        return shortName + (value?.let { "(`$value`)" } ?: "")
     }
 }

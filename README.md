@@ -1,4 +1,14 @@
-# Rekoil
+<p align="center">
+    <img alt="oss image" src="docs/zoss-logo.svg" height="200px" width="200px">
+</p>
+
+<p align="center">
+  <a href="https://twitter.com/intent/tweet?text=How%20to%20promote%20your%20open-source%20projects%20@ZenikaOSS&url=https://github.com/zenika-open-source/open-source-promotion-cheat-sheet&hashtags=OpenSource,CheatSheet">
+    <img alt="tweet" src="https://img.shields.io/twitter/url/https/twitter?label=Share%20on%20twitter&logo=twitter" target="_blank" />
+  </a>
+</p>
+
+<h1 align="center">Rekoil</h1>
 
 [![Kotlin version 1.3.X](https://img.shields.io/badge/kotlin-1.3.71-orange.svg?sytle=flat)](https://confluence.jetbrains.com/display/ALL/JetBrains+on+GitHub)
 [![GitHub license](https://img.shields.io/badge/license-Apache%20License%202.0-blue.svg?style=flat)](https://www.apache.org/licenses/LICENSE-2.0)
@@ -44,9 +54,14 @@ of updates to the single source of truth across nodes that depend on it.
   * [Recoil: State Management - Dave McCabe](https://youtu.be/_ISAA_Jt9kI) (ReactEurope 2020 talk)
 
 ## Using in your projects
-The Rekoil library is published to [musotec's bintray](https://bintray.com/musotec/maven) repository and linked to JCenter (hopefully).
+The Rekoil library is published to [musotec's bintray](https://bintray.com/musotec/maven) repository and linked to JCenter.
 
-### Maven
+<br />
+
+<details>
+<summary>👌 Maven</summary>
+<p>
+
 ```xml
 <dependency>
   <groupId>tech.muso.rekoil</groupId>
@@ -54,6 +69,10 @@ The Rekoil library is published to [musotec's bintray](https://bintray.com/musot
   <version>0.0.1</version>
 </dependency>
 ```
+
+</p>
+</details>
+
 ### Gradle
 
 Add dependencies. (Currently built against Kotlin version `1.3.71`)

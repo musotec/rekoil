@@ -3,10 +3,13 @@ package tech.muso.rekoil.core
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import tech.muso.rekoil.RekoilDependencyException
+import tech.muso.rekoil.RekoilLazyNodeRegistrationException
 import tech.muso.rekoil.core.RekoilContext.Key
 import tech.muso.rekoil.core.RekoilContext.Node
 import tech.muso.rekoil.core.RekoilContext.ValueNode
 import java.io.Serializable
+import kotlin.coroutines.*
 
 // TODO: use or remove. restriction is probably fine.
 //public abstract class AbstractRekoilContextNode(public override val key: Key<*>) : Node
@@ -48,8 +51,8 @@ public fun <N : Node> Node.getPolymorphicElement(key: Key<N>): N? {
 //
 //    public override fun <N : Node> get(key: Key<N>): N? = null
 //    // TODO: support operator functions, for Empty case, simple returns
-////    public override fun plus(context: RekoilContext): RekoilContext = context
-////    public override fun minusKey(key: Key<*>): RekoilContext = this
+//    public override fun plus(context: RekoilContext): RekoilContext = context
+//    public override fun minusKey(key: Key<*>): RekoilContext = this
 //    public override fun hashCode(): Int = 0
 //    public override fun toString(): String = "EmptyRekoilContext"
 //}
@@ -58,6 +61,8 @@ internal class RootRekoilNode(
     override val coroutineScope: CoroutineScope
 ) : Node, Key<RootRekoilNode> {
 
+    private val continuations = mutableListOf<RekoilContinuation>()
+
     companion object Key : RekoilContext.Key<RootRekoilNode>
 
     override val key: RekoilContext.Key<RootRekoilNode>
@@ -65,6 +70,29 @@ internal class RootRekoilNode(
 
     override fun invalidate() {
         TODO("Determine if this should not be called and maybe throw IllegalStateException.")
+    }
+
+    suspend fun registerContinuation(node: ValueNode<*>?) =
+        suspendCoroutine<Any?> { continuation ->
+            continuations.add(
+                    RekoilContinuation(node, continuation)
+            )
+
+//            performAsync { value, exception ->
+//                when {
+//                    exception != null -> // operation had failed
+//                        continuation.resumeWithException(exception)
+//                    else -> // succeeded, there is a value
+//                        continuation.resume(value as T)
+//                }
+//            }
+        }
+
+    fun runContinuations(node: ValueNode<*>) {
+        continuations.forEach {
+            it.continuation.resume(null)
+            continuations.remove(it)
+        }
     }
 }
 
@@ -105,19 +133,25 @@ internal class CombinedRekoilContextImpl(
         }
     }
 
+//    public override fun <R> fold(initial: R, operation: (R, Node) -> R): R =
+//            operation(left.fold(initial, operation), node)
+
     private fun contains(node: Node): Boolean =
         get(node.key) == node
 }
+
+internal data class RekoilContinuation(val node: ValueNode<*>?, val continuation: Continuation<Any?>)
 
 /**
  * A RekoilContext that manages the connection between Nodes within its context.
  */
 internal class SupervisorRekoilContextImpl(
-    private val node: Node
+    private val parent: RekoilContext?,
+    internal val rootNode: Node
 ) : RekoilContext, Serializable {
 
     override val coroutineScope: CoroutineScope
-        get() = node.coroutineScope
+        get() = rootNode.coroutineScope
 
     // TODO: maybe sort these nodes by most frequently updated??
     private val cachedNodes: MutableMap<Key<*>, Node> = mutableMapOf()
@@ -133,6 +167,8 @@ internal class SupervisorRekoilContextImpl(
 
     /*
      * Clear the list of dependencies for the passed node.
+     * TODO: should this be allowed? if you clear dependencies then you need to remake them.
+     *   probably want a combination of selectors.
      */
     fun resetDependencies(node: Node) {
         dependencyList[node.key]?.clear()
@@ -147,37 +183,78 @@ internal class SupervisorRekoilContextImpl(
 
     /*
      * Get the value and register a dependency.
+     * Called from [SelectorImpl].invalidate]
      */
+    @Suppress("SENSELESS_COMPARISON") // nodes can be null in spite of compiler
     suspend fun <R, N : ValueNode<R>> getAndRegister(callerKey: Key<*>, node: N): R {
+        // check for race condition between scope evaluation and node instantiation
+        if (node == null) {
+            println("$this Suspending ==> $callerKey.getAndRegister($node)")
+//            suspendCoroutine<R> {
+//                (rootNode as RootRekoilNode).registerContinuation()
+//                // TODO: determine that this has no problems.
+//            }
+
+            (rootNode as RootRekoilNode).registerContinuation(node)
+
+            println("$this Resumed <== $callerKey.getAndRegister($node)")
+
+            return getAndRegister(callerKey, node)
+
+            // suspending the Coroutine _should_ have no problems on its own (possibly?) due to the suspension being
+            // continued automatically when the time for next execution is available.
+            // then we recursively re-call this function, at which point we hope the node has been created.
+
+            // FIXME: for very large programs this _probably_ has problems. (longer to create variables known to compiler)
+            //   we will want to use RootRekoilNode to resume the Continuation(s) and smartly re-evaluate.
+
+            // NOTE: this is only a "problem" because we automatically generate keys by lazy delegate
+        }
+
+        if(dependencyList[node.key] == null)
+            return parent?.get(node)
+                    ?: throw RekoilDependencyException(
+                            "Node ($node) is not accessible " +
+                            "from within the current rekoil scope!"
+                    )
+
+        if(dependencyList[node.key] == null)
+            throw RekoilLazyNodeRegistrationException()
+
         // add the caller, requesting value of `node` as a dependency
-        if (!dependencyList[node.key]!!.contains(callerKey)) {
+        if (!dependencyList[node.key]!!.contains(callerKey)) {  // TODO: another type of exception?
             dependencyList[node.key]!!.add(callerKey)
         }
 
-        // get the cached value.
-        if (node is SelectorImpl<*> && node.isValid != true) {     // TODO: better way to do this. (isValid)?
-            // if the value is null, then attempt
+        // below is the logic to obtain the cached selector value
+        // without re-computation if it is still valid and we have it
 
+        // if statement checks first for is SelectorImpl because
+        // case is false for all Atoms, which do not have property `valid`.
+        if (node is SelectorImpl<*> && node.valid != true) {
+            // but when it isn't valid; we create a Deferred for when it is ready.
             val deferred: CompletableDeferred<R> = mutex.withLock { // use lock when accessing deferred cache
-                // return existing deferrable if present
+                // return existing deferrable if present.
                 if (pendingValues.containsKey(node.key)) {
                     @Suppress("UNCHECKED_CAST")
                     pendingValues[node.key] as CompletableDeferred<R>
                 } else {
-                    // new completable and cache it.
+                    // otherwise make new completable and memoize it.
                     CompletableDeferred<R>().also {
                         pendingValues[node.key] = it
-//                            println("dbg - $callerKey asked for $node - MADE NEW cached deferrable $it")
+                        // any pending values are looked up and emitted
+                        // when the RekoilContext subscription receives it
+                        Log.v("$callerKey asked for $node (invalid); Made new deferrable - $it")
                     }
                 }
             }
             // then await the result
             deferred.await()
-//            println("dbg - $callerKey asked for $node - deferrable returned ${deferred.getCompleted()}")
+            Log.v("$callerKey asked for $node - deferrable returned ${deferred.getCompleted()}")
             return deferred.getCompleted()
         } else {
-            // otherwise return the value from the node.
-            return get(node)!!
+            // when valid, return from `node.value` directly (well we look up the key)
+            return get(node) ?: throw RekoilLazyNodeRegistrationException()
         }
     }
 
@@ -194,20 +271,28 @@ internal class SupervisorRekoilContextImpl(
             dependencyList[childNode.key] = mutableListOf()
         }
 
+        (rootNode as RootRekoilNode).runContinuations(childNode)
+
         // create a subscription and consume updates
         childNode.subscribe {
+            Log.r("$this.update($childNode -> $it)  [${Thread.currentThread().name}]")
+
             // update values in async context for mutex synchronization against suspend functions.
             coroutineScope.async {
                 // so that we can lock against get(node): T and release()
                 mutex.withLock {
-//                    println("dbg - $childNode sent $it")
                     // update the completable deferred for any selectors waiting on the result
                     @Suppress("UNCHECKED_CAST")
                     if (pendingValues[childNode.key] as? CompletableDeferred<T> != null) {
-//                        println("dbg - $childNode posting deferred result $it")
+                        Log.v("$childNode !! posting deferred result $it !!")
                         (pendingValues[childNode.key] as? CompletableDeferred<T>)?.complete(it)
                         pendingValues.remove(childNode.key)
+
+                        // do not invalidate currently running coroutines that are
+                        // currently deferred (whose result we just returned).
+                        return@withLock // return to avoid cancellation via invalidate below
                     }
+
                     // invalidate all the nodes in this scope
                     // TODO: improve by separating out Selectors? Atoms shouldn't have dependencies.
                     dependencyList[childNode.key]?.forEach { key ->
@@ -215,24 +300,44 @@ internal class SupervisorRekoilContextImpl(
                     }
                 }
             }
+        }.also {
+            Log.r("$this.register() <- $childNode via $it)")
+            // when we have released the node, this channel will be closed
+            it.invokeOnCompletion {
+                // TODO: mark the ValueNode as released and throw IllegalStateException upon access.
+
+                // release dependants on childNode?
+
+                // remove dependency list
+                dependencyList.remove(childNode.key)
+
+                // TODO: does a removed node leak? possibly if reference held.
+                // release childNode?
+                (childNode as? Selector<*>)?.apply {
+                    release()
+                    releaseScope()
+                }
+            }
         }
     }
 
     /*
-     * Release all the nodes in the scope so long as the
+     * Release all the nodes in the scope to clean up their BroadcastChannels.
+     * NOTE: important that this does not be named release()
+     *   to avoid conflicting with the Selector.release() which is both a ValueNode
+     *   with a channel and contains it's own scope.
      */
-    fun release() {
-        // TODO: this should use suspend function NOT async.
+    fun releaseScope() {
+        // TODO: this should probably be a suspend function and NOT async in a new coroutine.
         coroutineScope.launch {
             mutex.withLock {
                 cachedNodes.forEach {
-                    (it.value as? ValueNode<*>)?.let {
-                        if (it is SelectorImpl<*>) {
-                            // FIXME: this can almost certainly break explicit release()
-                            //  but for now, the coroutineScope will always destroy channels
-                            if (it.isValid == false) return@let
+                    (it.value as? ValueNode<*>)?.let { node ->
+                        // release child scope of selector.
+                        if (node is SelectorImpl<*>) {
+                            node.releaseScope()
                         }
-                        it.release()
+                        node.release()
                     }
                 }
             }
@@ -246,10 +351,20 @@ internal class SupervisorRekoilContextImpl(
         return AtomImpl<T>(coroutineScope, this, default)
     }
 
-    fun <T> Selector(
+    inline fun <T> Selector(
+        parent: RekoilContext = this,
         coroutineScope: CoroutineScope = this.coroutineScope,
-        selectorScope: suspend SelectorScope.() -> T
+        noinline selectorScope: suspend SelectorScope.() -> T
     ): Selector<T?> {
-        return SelectorImpl<T>(coroutineScope, this, selectorScope)
+        return SelectorImpl<T>(coroutineScope, parent, this, selectorScope)
+    }
+
+    override fun hashCode(): Int {
+        return super.hashCode()
+    }
+
+    override fun toString(): String {
+        return "RekoilContext[${Integer.toHexString(rootNode.key.hashCode())}]" +
+                (parent?.let { "(parent=$parent)"} ?: "")
     }
 }

@@ -24,7 +24,7 @@ internal abstract class ValueNodeImpl<T>(
      */
     @ExperimentalCoroutinesApi
     private fun makeChannel(): BroadcastChannel<T> {
-        return ConflatedBroadcastChannel<T>()
+        return ConflatedBroadcastChannel<T>()   // use conflated BroadcastChannel for memory reasons
     }
 
     /*
@@ -43,15 +43,15 @@ internal abstract class ValueNodeImpl<T>(
             // FIXME: this should not invalidate the parent
             // immediately send existing value over to the new subscriber
             if (this is SelectorImpl<*>) {
-                if (this.isValid != true) return@also // don't emit if we aren't valid on listen.
+                if (this.valid != true) {
+                    Log.r("${this@ValueNodeImpl} openSubscription()")
+                    return@also // don't emit if we aren't valid on listen.
+                }
             }
 
-
-            coroutineScope.launch {
-                // default case; emit current value for convenience
-                printdbg("${this@ValueNodeImpl} openSubscription() -> send($value)")
-                send(value)
-            }
+            // default case; emit current value for convenience
+            Log.r("${this@ValueNodeImpl} openSubscription() -> send($value)")
+            forcedSend(value)
         }
     }
 
@@ -63,11 +63,9 @@ internal abstract class ValueNodeImpl<T>(
     @ExperimentalCoroutinesApi
     override fun subscribe(onValueChanged: (T) -> Unit): Job {
         return coroutineScope.async {
-            printdbg("${this@ValueNodeImpl} subscribed")
-            var lastReceivedValue: T? = null
+            Log.w("${this@ValueNodeImpl} subscribed to <- Job:[$this]")
             openSubscription().consumeEach {
-                if (lastReceivedValue != it) onValueChanged(it)
-                lastReceivedValue = it
+                onValueChanged(it)
             }
         }
     }
@@ -77,21 +75,41 @@ internal abstract class ValueNodeImpl<T>(
      * TODO: evaluate if this could be async.
      *  Currently, passed value is already computed, so no need to suspend.
      */
+    var senderJob: Job? = null
     @Suppress("NOTHING_TO_INLINE")
-    internal inline fun send(newValue: T) {
-        coroutineScope.launch {
-            printdbg("$this !! send($value)")
+    internal inline fun send(newValue: T, crossinline onSendComplete: (value: T) -> Unit) {
+        if (senderJob?.isActive == true) {
+            Log.v("$this cancelled ongoing send (value updated to $newValue)")
+        }
+        senderJob?.cancel() // cancel any currently pending sends to prevent flooding broadcast channel
+        senderJob = coroutineScope.launch {
+            Log.v("$this !! send($value)")
             broadcastChannel?.send(newValue)
+            onSendComplete.invoke(newValue)
+        }
+//        .also {
+//            it.invokeOnCompletion {
+//                Log.v("$this senderJob.onComplete(error:${it!=null}) -> field = $newValue")
+//            }
+//        }
+    }
+
+    internal inline fun forcedSend(value: T) {
+        coroutineScope.launch {
+            Log.v("$this !! forcedSend($value)")
+            broadcastChannel?.send(value)
         }
     }
 
     /*
-     * Release our BroadcastChannel (independently scoped) manually, stopping all pending receives.
+     * Release our BroadcastChannel (independently scoped) manually.
+     * This stops all receiver Jobs and invokes the code block in [onRelease],
+     * passing through the last value upon being closed.
      */
     override fun release() {
-        broadcastChannel?.close() // Throwable("Selector $this was released."))
+        broadcastChannel?.close()
         broadcastChannel = null
-        releaseCallback?.invoke(value)  // pass through the last cached value to any callback
+        releaseCallback?.invoke(value)
     }
 
     /*

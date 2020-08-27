@@ -45,8 +45,33 @@ public interface RekoilContext {
 
     // TODO: implement operator fun plus to combine two contexts;
     //  removing duplicate keys from this, in favor of [other] (more recent)
+    /**
+     * Accumulates entries of this context starting with [initial] value and applying [operation]
+     * from left to right to current accumulator value and each element of this context.
+     */
+//    public fun <R> fold(initial: R, operation: (R, RekoilContext.Node) -> R): R
 
-//    operator fun plus(other: RekoilContext): RekoilContext
+    /**
+     * Returns a context containing elements from this context and elements from  other [context].
+     * The elements from this context with the same key as in the other one are dropped.
+     */
+//    public operator fun plus(context: RekoilContext): RekoilContext =
+//            if (context === EmptyRekoilContext) this else // fast path -- avoid lambda creation
+//                context.fold(this) { acc, node ->
+//                    val removed = acc.minusKey(node.key)
+//                    if (removed === EmptyRekoilContext) node else {
+//                        // make sure root node is always last in the context (and thus is fast to get when present)
+////                        val interceptor = removed[ContinuationInterceptor]
+////                        if (interceptor == null) CombinedContext(removed, node) else {
+////                            val left = removed.minusKey(ContinuationInterceptor)
+////                            if (left === EmptyCoroutineContext) CombinedContext(node, interceptor) else
+////                                CombinedContext(CombinedContext(left, node), interceptor)
+//                        CombinedRekoilContextImpl(left, node)
+//                        }
+//                    }
+//                }
+//
+//    public fun minusKey(key: Key<*>): RekoilContext
 
     // TODO: probably also want minus operator to obtain new context that excludes nodes.
 
@@ -72,6 +97,10 @@ public interface RekoilContext {
     }
 
     public interface ValueNode<T> : Node {
+//        private inline fun <reified T> typeName(): String {
+//            return T::class.java.name
+//        }
+
         /**
          * The getter returns the cached value of the Node.
          * The setter will cache and publish the new value to all observers.

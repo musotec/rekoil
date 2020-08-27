@@ -4,11 +4,16 @@ import kotlinx.coroutines.*
 
 /**
  * Defines a scope for a new Rekoil dependency graph.
+ *
+ * A RekoilScope provides access to the creation methods [atom] and [selector]
+ * while also encapsulating the [CoroutineScope] that should control execution.
+ *
+ * Every RekoilScope contains a [RekoilContext] which contains the [RekoilContext.get]
+ * method.
  */
 public interface RekoilScope {
-    // FIXME: should all scopes have nodes?
-//    internal val node: RekoilContext.Node?
 
+    // FIXME: this rekoilContext should probably be private/internal.
     public val rekoilContext: RekoilContext
 
     /**
@@ -35,9 +40,19 @@ public interface RekoilScope {
     ) : Selector<R?>
 
     /**
+     * Generate a Selector within the current RekoilScope, inheriting the RekoilScope passed.
+     */
+    public fun <R> withScope(
+            borrowedRekoilScope: RekoilScope,
+            coroutineScope: CoroutineScope = rekoilContext.coroutineScope,
+            key: RekoilContext.Key<Selector<R>>? = null,
+            value: suspend SelectorScope.() -> R
+    ) : Selector<R?>
+
+    /**
      * Release all the nodes within this RekoilScope.
      */
-    fun release()
+    fun releaseScope()
 }
 
 public interface SelectorScope : RekoilScope {
@@ -47,6 +62,19 @@ public interface SelectorScope : RekoilScope {
     public suspend fun <R> get(
         node: RekoilContext.ValueNode<R>
     ) : R
+
+    public fun release()
+
+    /**
+     * Generate a Selector within the RekoilScope.
+     * The selector returns a new RekoilScope for scoping within the Selector only.
+     */
+//    public fun <R> selector(
+//            coroutineScope: CoroutineScope = rekoilContext.coroutineScope, // inherit parent scope by default
+//            key: RekoilContext.Key<Selector<R>>? = null,
+//            value: suspend SelectorScope.() -> R
+//    ) : Selector<R?>
+
 }
 
 
@@ -56,7 +84,7 @@ public interface SelectorScope : RekoilScope {
  * from the outer scope, following the execution pattern of the [coroutineScope] Contract Builder.
  *
  * If [launch] is true, then the RekoilScope will be launched into a new scope.
- * Then the RekoilScope will require a manual [RekoilScope.release] call.
+ * Then the RekoilScope will require a manual [RekoilScope.releaseScope] call.
  */
 public suspend fun rekoilScope(launch: Boolean = false, block: suspend RekoilScope.() -> Unit) {
     // TODO: use and implement contracts for some compile time protection
@@ -69,7 +97,7 @@ public suspend fun rekoilScope(launch: Boolean = false, block: suspend RekoilSco
         } else {
             val rekoilScope = RekoilScope(this)
             block.invoke(rekoilScope)
-            rekoilScope.release()
+            rekoilScope.releaseScope()
         }
     }
 }
@@ -94,6 +122,10 @@ public suspend fun rekoilScope(launch: Boolean = false, block: suspend RekoilSco
 @Suppress("FunctionName")
 public fun RekoilScope(coroutineScope: CoroutineScope): RekoilScope =
     RekoilScopeImpl(coroutineScope) // TODO: potentially rescope coroutine scope to allow for our internal scope cancellation.
+
+@Suppress("FunctionName")
+public fun RekoilScope(coroutineDispatcher: CoroutineDispatcher): RekoilScope =
+    RekoilScope(CoroutineScope(coroutineDispatcher))
 
 /**
  * Launches a new RekoilScope in the background on the provided CoroutineScope

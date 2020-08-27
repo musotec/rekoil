@@ -9,6 +9,7 @@
 | Name | Summary |
 |---|---|
 | [get](get.md) | Get the value of the passed node, registering the dependency with the parent scope.`abstract suspend fun <R> get(node: ValueNode<R>): R` |
+| [release](release.md) | `abstract fun release(): `[`Unit`](https://kotlinlang.org/api/latest/jvm/stdlib/kotlin/-unit/index.html) |
 
 ### Extension Functions
 

@@ -18,7 +18,22 @@ Used internally. TODO: create documentation when supporting library extension.
 
 |
 
+##### [tech.muso.rekoil.ktx.FibonacciHeap2](../tech.muso.rekoil.ktx/-fibonacci-heap2/index.md)
+
+
+|
+
 ##### [tech.muso.rekoil.core.RekoilContext](../tech.muso.rekoil.core/-rekoil-context/index.md)
+
+
+|
+
+##### [tech.muso.rekoil.RekoilDependencyException](../tech.muso.rekoil/-rekoil-dependency-exception/index.md)
+
+
+|
+
+##### [tech.muso.rekoil.RekoilLazyNodeRegistrationException](../tech.muso.rekoil/-rekoil-lazy-node-registration-exception/index.md)
 
 
 |
@@ -36,5 +51,10 @@ Defines a scope for a new Rekoil dependency graph.
 |
 
 ##### [tech.muso.rekoil.core.SelectorScope](../tech.muso.rekoil.core/-selector-scope/index.md)
+
+
+|
+
+##### [tech.muso.rekoil.core.SupervisorScopeImpl](../tech.muso.rekoil.core/-supervisor-scope-impl/index.md)
 
 
