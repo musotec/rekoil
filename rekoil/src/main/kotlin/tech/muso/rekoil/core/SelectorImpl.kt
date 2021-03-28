@@ -85,6 +85,11 @@ internal class SelectorImpl<T> (
                     return@invokeOnCompletion
                 }
 
+                // FIXME: Do not uncomment. There is likely a problem with the setup of your selector.
+//                if (exception is NoSuchElementException) {
+//                    return@invokeOnCompletion
+//                }
+
                 // if any error other than LazyRegistration (will re-evaluate?)
                 // then elevate the exception
                 if (exception !is RekoilLazyNodeRegistrationException) {

@@ -27,9 +27,11 @@ internal open class AtomImpl<T : Any>(
     override fun <N : RekoilContext.Node> get(key: RekoilContext.Key<N>): N? =
         getPolymorphicElement(key)
 
-    // recompute the value function
+    // for atoms, we will resend the value to notify the parent.
     override fun invalidate() {
-        value = default()   // TODO: evaluate in async
+        send(value) {
+            Log.a("$shortName send($value))")
+        }
     }
 
     @Volatile override var value = default().also {

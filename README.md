@@ -1,14 +1,8 @@
 <p align="center">
-    <img alt="oss image" src="docs/zoss-logo.svg" height="200px" width="200px">
+    <img alt="oss image" src="docs/rekoil.svg" height="201px" width="672px">
 </p>
 
-<p align="center">
-  <a href="https://twitter.com/intent/tweet?text=How%20to%20promote%20your%20open-source%20projects%20@ZenikaOSS&url=https://github.com/zenika-open-source/open-source-promotion-cheat-sheet&hashtags=OpenSource,CheatSheet">
-    <img alt="tweet" src="https://img.shields.io/twitter/url/https/twitter?label=Share%20on%20twitter&logo=twitter" target="_blank" />
-  </a>
-</p>
-
-<h1 align="center">Rekoil</h1>
+<h1 align="center">rekoil</h1>
 
 [![Kotlin version 1.3.X](https://img.shields.io/badge/kotlin-1.3.71-orange.svg?sytle=flat)](https://confluence.jetbrains.com/display/ALL/JetBrains+on+GitHub)
 [![GitHub license](https://img.shields.io/badge/license-Apache%20License%202.0-blue.svg?style=flat)](https://www.apache.org/licenses/LICENSE-2.0)
@@ -16,9 +10,9 @@
 
 Rekoil is a reactive Kotlin API for lightweight state management as an extension of Coroutines. 
 
-This is a companion version for Kotlin `1.3.71` release. [Multiplatform](https://github.com/Kotlin/kotlinx.coroutines#multiplatform) support is planned, but currently not tested or implemented.
+This is a companion to Kotlin and kotlinx-coroutines past the `1.3.72` release. [Multiplatform](https://github.com/Kotlin/kotlinx.coroutines#multiplatform) support is planned, but currently not tested or implemented.
 
-This version is experimental, is likely to change, and is currently only tested on the JVM. 
+This version is experimental, is likely to change, and is currently only tested on the JVM and Android. 
 
 ```kotlin
 suspend fun main() = rekoilScope {
@@ -32,14 +26,21 @@ suspend fun main() = rekoilScope {
 
 > This is an unofficial Kotlin implementation of the architecture behind [facebookexperimental/Recoil](https://github.com/facebookexperimental/Recoil) (https://recoiljs.org) 
 
+## rekoil in use
+
+[![Android Demo](preview.gif)](https://www.youtube.com/watch?v=qOR2nxB3C-k)
+
+[Check out this example and more.](https://github.com/musotec/rekoil-examples/tree/master/rekoil-android-example)
+
 ## Motivation
-The goal of this project is to simplify the creation and interaction of application components
+The goal of this project is to simplify the creation and reactive interaction of application components
 by encapsulating single sources of truth as nodes.\
 These nodes are lightweight and abstract the boilerplate involved with the communication
 of updates to the single source of truth across nodes that depend on it.
 
 ## Documentation
 
+* [Changelog](CHANGELOG.md)
 * Basic Guide
   * [Atoms](docs/atoms.md)
   * [Selectors](docs/selectors.md)
@@ -66,7 +67,7 @@ The Rekoil library is published to [musotec's bintray](https://bintray.com/musot
 <dependency>
   <groupId>tech.muso.rekoil</groupId>
   <artifactId>rekoil</artifactId>
-  <version>0.0.1</version>
+  <version>0.0.3</version>
 </dependency>
 ```
 
@@ -75,11 +76,13 @@ The Rekoil library is published to [musotec's bintray](https://bintray.com/musot
 
 ### Gradle
 
-Add dependencies. (Currently built against Kotlin version `1.3.71`)
+Add dependencies. (Currently built against Kotlin version `1.3.72`) \
+Note that `kotlin-stdlib` must be included in your project. However, the `kotlinx-coroutines` library does not.
+When this project changes to versions 1.4.0 and higher, the kotlin-stdlib will be included by the coroutines library.
 
 ```groovy
 dependencies {
-    implementation("tech.muso.rekoil:rekoil:0.0.1")
+    implementation("tech.muso.rekoil:rekoil:0.0.3")
 }
 ```
 
@@ -108,7 +111,7 @@ use `androidx.lifecycle:lifecycle-runtime-ktx:2.2.0-alpha01` or higher.
 Then use as such:
 ```kotlin
 val rekoilScope = RekoilScope(viewModelScope).launch {
-
+    // your rekoil code here
 }
 ```
 

@@ -86,6 +86,7 @@ internal fun <T> RekoilContext.ValueNode<T>.subscribeTest(
     val label = tag?.let { "[${it()}]" } ?: ""
     val expectedList = expectedValues.asList()
     subscribe {
+        println("___")
         assertEquals(expectedList[receivedUpdates.getAndIncrement()], it, "$label onValue($this)")
     }   // subscribe channel may finish after onRelease() for pending message
 

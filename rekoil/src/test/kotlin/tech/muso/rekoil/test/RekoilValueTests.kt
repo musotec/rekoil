@@ -18,6 +18,49 @@ class RekoilValueTests {
     }
 
     @Test
+    fun testAtomInvalidateValue() = rekoilScopeTest {
+        val testAtom = defaultAtom()
+        var count = 0
+
+        testAtom.subscribe {
+            assertEquals("default", it)
+            count++
+        }
+
+        testAtom.invalidate()
+        testAtom.invalidate()
+
+        assertEquals(3, count)      // initial + 2 invalidates
+
+        var countTwo = 0
+        // test same behavior using selector
+        val testSelector = selector {
+            val s = get(testAtom)
+            countTwo++
+            s.length
+        }
+
+        assertEquals(1, countTwo)   // initial only
+
+        // test Atom -> Selector -> Subscriber
+        var countThree = 0
+        testSelector.subscribe {
+            assertEquals("default".length, it)
+            println("s: $it")
+            countThree++
+        }
+
+        testAtom.invalidate()
+        testAtom.invalidate()
+
+        assertEquals(5, count)      // initial + 4 invalidates
+        assertEquals(3, countTwo)   // initial + 2 invalidates
+
+        // initial + 2 invalidates + 1 from selector recompute (2nd invalidate ignored because value repeated)
+        assertEquals(4, countThree)
+    }
+
+    @Test
     fun testAtomValueMutationDirect() = rekoilScopeTest {
         val testAtom = defaultAtom()
         testAtom.value = ATOM_VALUE_2

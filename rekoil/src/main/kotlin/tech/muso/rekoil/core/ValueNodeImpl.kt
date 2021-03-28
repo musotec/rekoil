@@ -37,6 +37,8 @@ internal abstract class ValueNodeImpl<T>(
         // just make sure channel is set to null in release().
         if (broadcastChannel == null) {
             makeChannel()
+            // when we make the channel, before we open a subscriber, set the initial value
+            broadcastChannel?.offer(value)
         }
 
         return broadcastChannel!!.openSubscription().also {
@@ -51,7 +53,6 @@ internal abstract class ValueNodeImpl<T>(
 
             // default case; emit current value for convenience
             Log.r("${this@ValueNodeImpl} openSubscription() -> send($value)")
-            forcedSend(value)
         }
     }
 
@@ -64,8 +65,17 @@ internal abstract class ValueNodeImpl<T>(
     override fun subscribe(onValueChanged: (T) -> Unit): Job {
         return coroutineScope.async {
             Log.w("${this@ValueNodeImpl} subscribed to <- Job:[$this]")
-            openSubscription().consumeEach {
-                onValueChanged(it)
+            openSubscription().apply {
+                // manually invoke for current; avoids triggering all previous subscribers
+                if (value != null) {
+                    coroutineScope.launch {
+                        onValueChanged(value)
+                    }
+                }
+                // now suspend by consuming received values until closed
+                consumeEach {
+                    onValueChanged(it)
+                }
             }
         }
     }

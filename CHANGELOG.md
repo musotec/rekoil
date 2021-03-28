@@ -1,10 +1,13 @@
 Change Log
 ==========
 
-Version 0.0.1 *(2020-06-16)*
+Version 0.0.3 *(2021-03-28)*
 ----------------------------
-
-Initial commit for pre-release version.
+- Fixed bug where subscription channels created later using `RekoilValue.subscribe()` would cause Selectors
+  observing the same RekoilValue to be invalidated (despite being up to date).
+- Changed behavior of `Atom.invalidate()` to resend its value to all observers, even if the value is unchanged.
+  - This is more in line with the behavior of `Selector.invalidate()` which causes the scope to be recomputed.
+- Clean up of README and documentation.
 
 Version 0.0.2 *(2020-08-14)*
 ----------------------------
@@ -21,3 +24,7 @@ Version 0.0.2 *(2020-08-14)*
     - Allows for simple reading of variable directly without dependency registration
 - Improve logging, which can be enabled from DbgHelpers.kt by setting debug to true
 - Clean up structure of Selector/Rekoil scope implementation, but there is still much clean up to be done.
+
+Version 0.0.1 *(2020-06-16)*
+----------------------------
+Initial commit for pre-release version.
